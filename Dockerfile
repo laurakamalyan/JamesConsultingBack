@@ -1,27 +1,31 @@
-FROM php:8.2-cli
+# Ստանում ենք PHP 8.1-ը՝ ֆաստ CGI
+FROM php:8.1-fpm
 
-# Set working directory
-WORKDIR /var/www
-
-# Install system dependencies
+# Պահանջվող գրադարաններ և գործիքներ
 RUN apt-get update && apt-get install -y \
-    git unzip curl libzip-dev zip \
-    && docker-php-ext-install pdo pdo_mysql zip
+    libpng-dev \
+    libjpeg-dev \
+    libfreetype6-dev \
+    zip \
+    git \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install gd \
+    && docker-php-ext-install pdo pdo_mysql
 
-# Install Composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+# Աշխատանքային պանակի կարգավորում՝ պրոյեկտի համար
+WORKDIR /app
 
-# Copy app files
-COPY . .
+# GitHub-ից կլոնում ենք մեր պրոյեկտը
+COPY . /app
 
-# Install PHP dependencies
+# Ներբեռնում ենք Composer-ը
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+
+# Կատարում ենք composer install
 RUN composer install --no-dev --optimize-autoloader
 
-# Laravel-specific: generate storage link & config cache
-RUN php artisan config:cache && php artisan route:cache && php artisan view:cache
+# Փակս պորտ՝ php-fpm համար
+EXPOSE 9000
 
-# Expose HTTP port
-EXPOSE 8000
-
-# Start Laravel built-in server
-CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
+# Քարոզում ենք php-fpm
+CMD ["php-fpm"]
